@@ -1,0 +1,25 @@
+{
+  "name": "wnacg-dl-helper",
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm i && vite",
+    "dev:firefox": "pnpm i && TARGET=firefox vite",
+    "build": "pnpm i && tsc && vite build",
+    "build:firefox": "pnpm i && tsc && TARGET=firefox vite build"
+  },
+  "dependencies": {
+    "lodash.debounce": "^4.0.8"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.256",
+    "@types/lodash.debounce": "^4.0.6",
+    "@vitejs/plugin-vue": "^4.5.0",
+    "@vue/compiler-sfc": "^3.3",
+    "pinia": "^2.1.7",
+    "typescript": "^5.3.2",
+    "vite": "^5.0.12",
+    "vite-plugin-web-extension": "^4.1.1",
+    "vue": "^3.3"
+  }
+}
