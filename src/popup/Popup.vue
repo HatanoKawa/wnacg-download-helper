@@ -1,20 +1,55 @@
 <template>
-  <div style="width: 200px; height: 200px;">
-    wnacg dl helper
-    <button @click="logChrome">copy all download link</button>
-    <div>{{ dlList }}</div>
-    <button @click="connectWebsocket">connect websocket</button>
-    <button @click="sendMsg">send msg</button>
-    <button @click="sendNativeMsg">native message test</button>
-    <button @click="sendLinkListToNativeApp">send link list to native app</button>
-    <button @click="testDirectlyConnectToAria2">connect aria2</button>
-    <button @click="validateAria2Rpc">check aria2 service</button>
+  <div style="width: 360px; padding: 12px;">
+    <div class="main-container" :style="{ border: `solid 2px ${aria2RpcStore.aria2rpcStatusColor}` }">
+      <h2>wnacg download helper</h2>
+      <p v-show="aria2RpcStore.aria2rpcStatus !== 'connected'">
+        You need to start an aria2 rpc server first. If you don't have one, check README.md to get more information.
+      </p>
+      <div class="rpc-option-container">
+        <div class="option-item">
+          <div>aria2 rpc server url: (required)</div>
+          <input v-model="aria2RpcStore.aria2rpcUrl" />
+        </div>
+        <div class="option-item">
+          <div>aria2 rpc server secret:</div>
+          <input v-model="aria2RpcStore.aria2rpcSecret" />
+        </div>
+        <div class="option-item">
+          <div>
+            aria2 rpc server state:
+          </div>
+          <div style="display: flex; align-items: center;">
+        <span
+          style="font-weight: bold;"
+          :style="{ color: aria2RpcStore.aria2rpcStatusColor }"
+        >
+          {{ aria2RpcStore.aria2rpcStatus }}
+        </span>
+            <button style="margin-left: auto;" @click="aria2RpcStore.connect()">reconnect</button>
+          </div>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; margin-top: 24px;">
+        <button class="action-btn" @click="logChrome">collect all download links</button>
+        <button class="action-btn">collect links haven't been collected</button>
+        <button class="action-btn" @click="testInsert">test insert</button>
+        <button class="action-btn" @click="testExport">test export</button>
+        <button class="action-btn" @click="testExportDownloadCollection">test export download collection</button>
+      </div>
+    </div>
   </div>
 </template>
 
 <script lang="ts" setup>
 import {ref} from "vue";
 import { useAria2RpcStore } from "./store/aria2rpc";
+import { useDatabaseStore } from "./store/database";
+
+const COLOR_SET = {
+  'connected': 'green',
+  'error': 'red',
+  'disconnected': 'orange',
+}
 
 const dlList = ref<string[][]>([])
 const logChrome = () => {
@@ -43,71 +78,84 @@ const logChrome = () => {
     })
 }
 
-let ws: WebSocket|undefined = undefined
-const connectWebsocket = () => {
-  ws = new WebSocket('ws://localhost:9550')
-  ws.addEventListener('open', () => {
-    console.warn('ws opened')
-    ws?.send('connection established')
-  })
-}
-const sendMsg = () => {
-  ws?.send('test msg')
-}
-
-const sendNativeMsg = () => {
-  chrome.runtime.sendNativeMessage(
-    'com.river_quinn.wnacg_dl_helper_service',
-    { text: 'test req' },
-  ).then(res => {
-    console.log(res)
-  })
-
-  // const port = chrome.runtime.connectNative('com.river_quinn.wnacg_dl_helper_service')
-  // /*
-  // Listen for messages from the app.
-  // */
-  // port.onMessage.addListener((response) => {
-  //   console.log("Received: " + response);
-  // });
-  //
-  // console.log("Sending:  ping");
-  // port.postMessage("test reqs");
-}
-
-const sendLinkListToNativeApp = () => {
-  chrome.tabs.query({
-    url: 'https://www.wnacg.com/photos-index-aid-*.html'
-  })
-    .then(tabs => {
-      Promise.allSettled(
-        tabs.map(tabData => {
-          return chrome.tabs.sendMessage(
-            tabData.id!,
-            { type: 'getDownloadLinks' }
-          )
-        })
-      ).then(res => {
-        const dlList = res
-          .map(r => r.status === 'fulfilled' ? r.value : undefined)
-          .filter(urlList => !!urlList)
-        console.warn(res)
-        console.warn(dlList)
-        chrome.runtime.sendNativeMessage(
-          'com.river_quinn.wnacg_dl_helper_service',
-          { albumList: dlList },
-        ).then(res => {
-          console.log(res)
-        })
-      })
-    })
-}
-
 const aria2RpcStore = useAria2RpcStore()
-const testDirectlyConnectToAria2 = () => {
-  aria2RpcStore.connect()
-}
+aria2RpcStore.connect()
 const validateAria2Rpc = () => {
   aria2RpcStore.validateAria2Server()
 }
+
+const databaseStore = useDatabaseStore()
+const exportTest = () => {
+  databaseStore.exportDatabase()
+}
+
+const testJson = {
+  "createTime": 1706976422454,
+  "albumList": [
+    {
+      "id": "238134",
+      "name": "[めそ山工務店 (めそ)] おきつねロリババソープランド [DL版]",
+      "url": "https://www.wnacg.com/photos-index-aid-238134.html",
+      "downloadLinks": [
+        "https://v1.wzip.download/down/2382/5b220ffa7e07cc1300ba34df82a3a49e.zip?n=[%E3%82%81%E3%81%9D%E5%B1%B1%E5%B7%A5%E5%8B%99%E5%BA%97%20(%E3%82%81%E3%81%9D)]%20%E3%81%8A%E3%81%8D%E3%81%A4%E3%81%AD%E3%83%AD%E3%83%AA%E3%83%90%E3%83%90%E3%82%BD%E3%83%BC%E3%83%97%E3%83%A9%E3%83%B3%E3%83%89%20[DL%E7%89%88]",
+        "https://v1.wzip.date/down/2382/5b220ffa7e07cc1300ba34df82a3a49e.zip?n=[%E3%82%81%E3%81%9D%E5%B1%B1%E5%B7%A5%E5%8B%99%E5%BA%97%20(%E3%82%81%E3%81%9D)]%20%E3%81%8A%E3%81%8D%E3%81%A4%E3%81%AD%E3%83%AD%E3%83%AA%E3%83%90%E3%83%90%E3%82%BD%E3%83%BC%E3%83%97%E3%83%A9%E3%83%B3%E3%83%89%20[DL%E7%89%88]"
+      ],
+      "createTime": 1706976422454,
+    },
+    {
+      "id": "238102",
+      "name": "(C103) [適齢期に食中毒 (沢村青)] ほしょ。 (艦隊これくしょん -艦これ-)",
+      "url": "https://www.wnacg.com/photos-index-aid-238102.html",
+      "downloadLinks": [
+        "https://v1.wzip.download/down/2382/e97fc84e736ca29d3768af7d9daa6788.zip?n=(C103)%20[%E9%81%A9%E9%BD%A2%E6%9C%9F%E3%81%AB%E9%A3%9F%E4%B8%AD%E6%AF%92%20(%E6%B2%A2%E6%9D%91%E9%9D%92)]%20%E3%81%BB%E3%81%97%E3%82%87%E3%80%82%20(%E8%89%A6%E9%9A%8A%E3%81%93%E3%82%8C%E3%81%8F%E3%81%97%E3%82%87%E3%82%93%20-%E8%89%A6%E3%81%93%E3%82%8C-)",
+        "https://v1.wzip.date/down/2382/e97fc84e736ca29d3768af7d9daa6788.zip?n=(C103)%20[%E9%81%A9%E9%BD%A2%E6%9C%9F%E3%81%AB%E9%A3%9F%E4%B8%AD%E6%AF%92%20(%E6%B2%A2%E6%9D%91%E9%9D%92)]%20%E3%81%BB%E3%81%97%E3%82%87%E3%80%82%20(%E8%89%A6%E9%9A%8A%E3%81%93%E3%82%8C%E3%81%8F%E3%81%97%E3%82%87%E3%82%93%20-%E8%89%A6%E3%81%93%E3%82%8C-)"
+      ],
+      "createTime": 1706976422454,
+    },
+    {
+      "id": "238092",
+      "name": "[もちもちブルドーザー部 (しゅぽーん)] 起きる前にはやめるから… (ブルーアーカイブ) [此处澄空个人汉化] [DL版]",
+      "url": "https://www.wnacg.com/photos-index-aid-238092.html",
+      "downloadLinks": [
+        "https://v1.wzip.download/down/2381/3dad4637dd820fcedb0866530beeef26.zip?n=[%E3%82%82%E3%81%A1%E3%82%82%E3%81%A1%E3%83%96%E3%83%AB%E3%83%89%E3%83%BC%E3%82%B6%E3%83%BC%E9%83%A8%20(%E3%81%97%E3%82%85%E3%81%BD%E3%83%BC%E3%82%93)]%20%E8%B5%B7%E3%81%8D%E3%82%8B%E5%89%8D%E3%81%AB%E3%81%AF%E3%82%84%E3%82%81%E3%82%8B%E3%81%8B%E3%82%89%E2%80%A6%20(%E3%83%96%E3%83%AB%E3%83%BC%E3%82%A2%E3%83%BC%E3%82%AB%E3%82%A4%E3%83%96)%20[%E6%AD%A4%E5%A4%84%E6%BE%84%E7%A9%BA%E4%B8%AA%E4%BA%BA%E6%B1%89%E5%8C%96]%20[DL%E7%89%88]",
+        "https://v1.wzip.date/down/2381/3dad4637dd820fcedb0866530beeef26.zip?n=[%E3%82%82%E3%81%A1%E3%82%82%E3%81%A1%E3%83%96%E3%83%AB%E3%83%89%E3%83%BC%E3%82%B6%E3%83%BC%E9%83%A8%20(%E3%81%97%E3%82%85%E3%81%BD%E3%83%BC%E3%82%93)]%20%E8%B5%B7%E3%81%8D%E3%82%8B%E5%89%8D%E3%81%AB%E3%81%AF%E3%82%84%E3%82%81%E3%82%8B%E3%81%8B%E3%82%89%E2%80%A6%20(%E3%83%96%E3%83%AB%E3%83%BC%E3%82%A2%E3%83%BC%E3%82%AB%E3%82%A4%E3%83%96)%20[%E6%AD%A4%E5%A4%84%E6%BE%84%E7%A9%BA%E4%B8%AA%E4%BA%BA%E6%B1%89%E5%8C%96]%20[DL%E7%89%88]"
+      ],
+      "createTime": 1706976422454,
+    }
+  ]
+}
+const testInsert = () => {
+  databaseStore
+    .insertDownloadCollection(testJson)
+    .then(res => {
+      console.warn(res)
+    })
+}
+
+const testExport = () => {
+  databaseStore.exportDatabase()
+}
+
+const testExportDownloadCollection = () => {
+  databaseStore.exportDownloadCollection(1706976422454)
+}
 </script>
+
+<style scoped>
+.main-container {
+  padding: 12px;
+}
+
+.rpc-option-container {
+  font-size: 16px;
+  padding: 12px;
+}
+
+.option-item {
+  margin-bottom: 6px;
+}
+
+.action-btn {
+  width: 90%;
+}
+</style>
