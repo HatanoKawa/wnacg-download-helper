@@ -1,8 +1,9 @@
 import { defineStore } from "pinia";
 import {
   Album,
-  DownloadCollection,
-  DownloadCollectionDb
+  DownloadCollectionDb,
+  DownloadCollectionQueryResult,
+  DownloadCollectionToSave
 } from "../types";
 import { createRxDatabase } from "rxdb";
 import { getRxStorageDexie } from 'rxdb/plugins/storage-dexie';
@@ -23,7 +24,16 @@ const COLLECTION_SCHEMA: RxJsonSchema<any> = {
       type: 'number',
       maxLength: 100,
     },
+    // albumIdList will exclude the ids of albums that already exist in the database
     albumIdList: {
+      type: 'array',
+      ref: 'album',
+      items: {
+        type: 'string'
+      }
+    },
+    // albumIdFullList will include all the ids of albums no matter they exist in the database or not
+    albumIdFullList: {
       type: 'array',
       ref: 'album',
       items: {
@@ -88,10 +98,10 @@ export const useDatabaseStore = defineStore("logDatabase", () => {
         console.warn(res)
         return res[0].populate('albumIdList')
       })
-      .then(res => {
-        console.warn('populate:')
-        console.warn(res)
-      })
+      // .then(res => {
+      //   console.warn('populate:')
+      //   console.warn(res)
+      // })
   }
 
   initDatabase()
@@ -122,40 +132,26 @@ export const useDatabaseStore = defineStore("logDatabase", () => {
       `download collection ${formatTime(collectionId)}.json`
     )
   }
-
-
-  // no matter noDuplicate is true or false,
-  // albums in the collection that already exist in the database will not be inserted again,
-
-  // when noDuplicate is true,
-  // the albumIdList of the collection will exclude the ids of albums that already exist in the database,
-  // and if all albums exist in the database, the collection will not be inserted.
-
-  // when noDuplicate is false,
-  // collection will be inserted no matter what,
-  // and the albumIdList of the collection will include all the ids of albums no matter they exist in the database or not.
-  const insertDownloadCollection = async (collection: DownloadCollection, noDuplicate = true) => {
-    const albumWithoutDuplicateData: Album[] = uniqBy(collection.albumList, 'id')
-    const albumInsertResult = await db.value?.album.bulkInsert(albumWithoutDuplicateData)
-    if (noDuplicate && (albumInsertResult?.success as any[]).length < 0) {
-      console.error('all albums exist in database, so the collection will not be inserted.')
-      return Promise.reject(new Error('all albums exist in database, so the collection will not be inserted.'))
-    }
+  
+  const insertDownloadCollection = async (collection: DownloadCollectionToSave) => {
+    const albumListWithoutDuplicateData: Album[] = uniqBy(collection.albumList, 'id')
+    const albumInsertResult = await db.value?.album.bulkInsert(albumListWithoutDuplicateData)
 
     const collectionToInsert: DownloadCollectionDb = {
       createTime: collection.createTime,
-      albumIdList: noDuplicate
-        ? (albumInsertResult?.success as any[]).map(album => album.id as string)
-        : collection.albumList.map(album => album.id)
+      albumIdList: (albumInsertResult?.success as any[]).map(album => album.id as string),
+      albumIdFullList: albumListWithoutDuplicateData.map(album => album.id)
     } as DownloadCollectionDb
     const downloadCollection = await db.value
       ?.download_collection
       .insert(collectionToInsert)
+    const albumFullList = await downloadCollection?.populate('albumIdFullList')
 
     return {
       createTime: downloadCollection.createTime,
-      albumList: albumInsertResult?.success.map(album => pick(album, ['id', 'name', 'url', 'downloadLinks', 'createTime', 'createTime']) as Album)
-    } as DownloadCollection
+      albumList: albumInsertResult?.success.map(album => pick(album, ['id', 'name', 'url', 'downloadLinks', 'createTime', 'createTime']) as Album),
+      albumFullList: albumFullList,
+    } as DownloadCollectionQueryResult
   }
 
   return {
