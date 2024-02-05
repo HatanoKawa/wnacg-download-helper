@@ -9,6 +9,7 @@
     "build:firefox": "pnpm i && tsc && TARGET=firefox vite build"
   },
   "dependencies": {
+    "@vueuse/core": "^10.7.2",
     "dayjs": "^1.11.10",
     "lodash-es": "^4.17.21",
     "lodash.debounce": "^4.0.8",

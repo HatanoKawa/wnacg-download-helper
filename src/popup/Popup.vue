@@ -8,11 +8,15 @@
       <div class="rpc-option-container">
         <div class="option-item">
           <div>aria2 rpc server url: (required)</div>
-          <input v-model="aria2RpcStore.aria2rpcUrl" />
+          <input v-model="aria2RpcStore.aria2Options.rpcUrl" />
         </div>
         <div class="option-item">
           <div>aria2 rpc server secret:</div>
-          <input v-model="aria2RpcStore.aria2rpcSecret" />
+          <input v-model="aria2RpcStore.aria2Options.secret" />
+        </div>
+        <div class="option-item">
+          <div>download path:</div>
+          <input v-model="aria2RpcStore.aria2Options.downloadPath" />
         </div>
         <div class="option-item">
           <div>
@@ -30,10 +34,9 @@
         </div>
       </div>
       <div style="display: flex; flex-direction: column; align-items: center; margin-top: 24px;">
-        <button class="action-btn" @click="logChrome">collect all download links</button>
-        <button class="action-btn">collect links haven't been collected</button>
+        <button class="action-btn" @click="collectAlbumData">collect all download links</button>
+        <button class="action-btn" @click="databaseStore.exportDatabase()">export database</button>
         <button class="action-btn" @click="testInsert">test insert</button>
-        <button class="action-btn" @click="testExport">test export</button>
         <button class="action-btn" @click="testExportDownloadCollection">test export download collection</button>
       </div>
     </div>
@@ -41,42 +44,9 @@
 </template>
 
 <script lang="ts" setup>
-import {ref} from "vue";
 import { useAria2RpcStore } from "./store/aria2rpc";
 import { useDatabaseStore } from "./store/database";
-
-const COLOR_SET = {
-  'connected': 'green',
-  'error': 'red',
-  'disconnected': 'orange',
-}
-
-const dlList = ref<string[][]>([])
-const logChrome = () => {
-  dlList.value = []
-  chrome.tabs.query({
-    url: 'https://www.wnacg.com/photos-index-aid-*.html'
-  })
-    .then(tabs => {
-      Promise.allSettled(
-        tabs.map(tabData => {
-          return chrome.tabs.sendMessage(
-            tabData.id!,
-            { type: 'getDownloadLinks' }
-          )
-        })
-      ).then(res => {
-        dlList.value = res
-          .map(r => r.status === 'fulfilled' ? r.value : [])
-          .filter(urlList => urlList?.length > 0)
-        navigator.clipboard.writeText(
-          dlList.value
-            .map(urlList => urlList[0])
-            .join('\n')
-        )
-      })
-    })
-}
+import type { DownloadCollectionToSave } from './types'
 
 const aria2RpcStore = useAria2RpcStore()
 aria2RpcStore.connect()
@@ -85,9 +55,6 @@ const validateAria2Rpc = () => {
 }
 
 const databaseStore = useDatabaseStore()
-const exportTest = () => {
-  databaseStore.exportDatabase()
-}
 
 const testJson = {
   "createTime": 1706976422454,
@@ -132,12 +99,47 @@ const testInsert = () => {
     })
 }
 
-const testExport = () => {
-  databaseStore.exportDatabase()
-}
 
 const testExportDownloadCollection = () => {
-  databaseStore.exportDownloadCollection(1706976422454)
+  databaseStore.exportDownloadCollection(testJson.createTime)
+}
+
+const checkIsLegalAlbum = (album: any) => album && album.id && album.name && album.url
+  && album.downloadLinks && Array.isArray(album.downloadLinks)
+  && (album.downloadLinks.length > 0)
+const collectAlbumData = () => {
+  chrome.tabs.query({
+    url: 'https://www.wnacg.com/photos-index-aid-*.html'
+  })
+    .then(tabs => {
+      Promise.allSettled(
+        tabs.map(tabData => {
+          return chrome.tabs.sendMessage(
+            tabData.id!,
+            { type: 'getAlbumData' }
+          )
+        })
+      ).then(res => {
+        const currentTime = Date.now()
+        const downloadCollection: DownloadCollectionToSave = {
+          createTime: currentTime,
+          albumList: res
+            .map(r => r.status === 'fulfilled' && checkIsLegalAlbum(r.value) ? r.value : null)
+            .filter(album => album != null)
+            .map(album => {
+              return {
+                ...album,
+                createTime: currentTime,
+              }
+            })
+        }
+        console.warn('collect downloadCollection: ', downloadCollection)
+        databaseStore.insertDownloadCollection(downloadCollection)
+          .then(res => {
+            console.warn('insertDownloadCollection: ', res)
+          })
+      })
+    })
 }
 </script>
 

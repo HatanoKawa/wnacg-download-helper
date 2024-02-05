@@ -4,6 +4,21 @@ const checkIsWnacgSite = () => {
 const checkIsAlbumMainPage = () => {
   return checkIsWnacgSite() && location.pathname.includes('photos-index-aid-')
 }
+let hasCollected = false
+let hasCollectedDom: HTMLElement | null = null
+const setHasCollected = (target: boolean) => {
+  if (hasCollectedDom) {
+    hasCollected = target
+    if (target) {
+      hasCollectedDom.style.color = 'green'
+      hasCollectedDom.innerText = 'has been collected'
+    } else {
+      hasCollectedDom.style.color = 'red'
+      hasCollectedDom.innerText = 'not collected'
+    }
+  }
+}
+
 const downloadLinkList: string[] = []
 if (checkIsAlbumMainPage()) {
   const container = document.querySelector('#bodywrap.userwrap>.asTB>.asTBcell')
@@ -28,7 +43,7 @@ if (checkIsAlbumMainPage()) {
   dlIFrame.onload = () => {
     downloadPanel.innerHTML = ''
     downloadPanel.style.width = '200px'
-    const dlATags = [...dlIFrame.contentDocument.querySelectorAll('body>.adbox>#adsbox>.down_btn')]
+    const dlATags: HTMLAnchorElement[] = Array.from(dlIFrame.contentDocument!.querySelectorAll('body>.adbox>#adsbox>.down_btn'))
     dlATags.map((aNode, nodeIndex) => {
       // 存储下载链接以用于收集并统一复制
       downloadLinkList.push(aNode.href)
@@ -48,13 +63,31 @@ if (checkIsAlbumMainPage()) {
     })
   }
   document.body.append(dlIFrame)
+
+  hasCollectedDom = document.createElement('div')
+  hasCollectedDom.style.width = '130px'
+  hasCollectedDom.style.display = 'inline-flex'
+  hasCollectedDom.style.justifyContent = 'center'
+  container?.append(hasCollectedDom)
+  setHasCollected(false)
 }
+
+const getAlbumData = () => ({
+  id: location.pathname.match(/photos-index-aid-(\d+)/)?.[1],
+  name: document.querySelector('#bodywrap>h2')?.innerHTML ?? document.title,
+  url: location.href,
+  downloadLinks: downloadLinkList
+})
 chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
-  if (req.type === 'getDownloadLinks') {
-    sendResponse({
-      albumName: document.querySelector('#bodywrap>h2')?.innerHTML ?? document.title,
-      url: location.href,
-      downloadLinks: downloadLinkList
-    })
+  if (req.type === 'getAlbumData') {
+    if (downloadLinkList.length === 0) {
+      sendResponse(null)
+    } else {
+      setHasCollected(true)
+      sendResponse(getAlbumData())
+    }
+  }
+  if (req.type === 'checkHasCollected') {
+    sendResponse(hasCollected)
   }
 })
