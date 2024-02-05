@@ -76,6 +76,7 @@ const ALBUM_SCHEMA: RxJsonSchema<any> = {
 
 export const useDatabaseStore = defineStore("database", () => {
   let db = shallowRef<RxDatabase>()
+  const allCollectionList = shallowRef<DownloadCollectionDb[]>([])
 
   const initDatabase = async () => {
     db.value = await createRxDatabase({
@@ -96,12 +97,8 @@ export const useDatabaseStore = defineStore("database", () => {
     db.value?.download_collection.find().exec()
       .then(res => {
         console.warn(res)
-        return res[0].populate('albumIdList')
+        allCollectionList.value = res
       })
-      // .then(res => {
-      //   console.warn('populate:')
-      //   console.warn(res)
-      // })
   }
 
   initDatabase()
@@ -155,6 +152,7 @@ export const useDatabaseStore = defineStore("database", () => {
   }
 
   return {
+    allCollectionList,
     initDatabase,
     insertDownloadCollection,
     exportDatabase,
