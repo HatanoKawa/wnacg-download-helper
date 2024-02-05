@@ -28,6 +28,15 @@ export const useAria2RpcStore = defineStore("aria2rpc", () => {
     aria2rpc = new WebSocket(aria2rpcUrl.value)
     aria2rpc.onopen = () => {
       aria2rpcStatus.value = "connected"
+      // because of wnacg's download speed limit,
+      // we set aria2's max-concurrent-downloads to 1 and max-overall-download-limit to 3M
+      changeGlobalOption({
+        options: {
+          "max-concurrent-downloads": "1",
+          "max-overall-download-limit": "3M",
+        },
+        id: "set-global-options"
+      })
     }
     aria2rpc.onclose = () => {
       aria2rpcStatus.value = "disconnected"
@@ -53,6 +62,14 @@ export const useAria2RpcStore = defineStore("aria2rpc", () => {
     callAria2Method({
       method: "aria2.addUri",
       params: [rpcOptions.uri, rpcOptions.options],
+      id: rpcOptions.id
+    })
+  }
+
+  const changeGlobalOption = (rpcOptions: { options: any, id: string }) => {
+    callAria2Method({
+      method: "aria2.changeGlobalOption",
+      params: [rpcOptions.options],
       id: rpcOptions.id
     })
   }

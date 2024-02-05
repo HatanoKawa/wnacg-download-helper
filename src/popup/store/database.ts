@@ -74,7 +74,7 @@ const ALBUM_SCHEMA: RxJsonSchema<any> = {
   required: ['id', 'name', 'url', 'downloadLinks', 'createTime']
 }
 
-export const useDatabaseStore = defineStore("logDatabase", () => {
+export const useDatabaseStore = defineStore("database", () => {
   let db = shallowRef<RxDatabase>()
 
   const initDatabase = async () => {
@@ -129,7 +129,7 @@ export const useDatabaseStore = defineStore("logDatabase", () => {
         ...pick(collection.toJSON(), ['createTime']),
         albumList: albumList?.map((album: any) => album.toJSON())
       },
-      `download collection ${formatTime(collectionId)}.json`
+      `download collection [${formatTime(collectionId)}].json`
     )
   }
   
