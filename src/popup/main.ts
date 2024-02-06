@@ -1,11 +1,7 @@
-/* JS files and framework components are HMR-ed */
-
 import { createApp } from "vue";
 import Popup from "./Popup.vue";
 import { pinia } from "./store";
-import './utils/rxdbDevPlugin'
-
-console.log("Loaded popup/main.ts");
+import './utils/rxdb-plugins'
 
 createApp(Popup)
   .use(pinia)

@@ -44,6 +44,20 @@ const collectAlbumData = () => {
       })
     })
 }
+
+const startDownloadCollectionById = (collectionId: number) => {
+  databaseStore.getDownloadCollection(collectionId)
+    .then(collectionData => {
+      console.warn('startDownloadCollectionById: ', collectionData)
+      if (collectionData) {
+        collectionData.albumList.forEach(album => {
+          rpcStore.startDownloadAlbum(album)
+        })
+      } else {
+        console.error('can not find collectionData by id: ', collectionId)
+      }
+    })
+}
 </script>
 
 <template>
@@ -77,7 +91,13 @@ const collectAlbumData = () => {
         </div>
       </div>
       <div>
-        <div class="action-anchor" style="color: skyblue;">DOWN</div>
+        <div
+          class="action-anchor"
+          style="color: skyblue;"
+          @click="startDownloadCollectionById(collectionData.createTime)"
+        >
+          DOWN
+        </div>
         <div
           class="action-anchor"
           style="color: orange;"

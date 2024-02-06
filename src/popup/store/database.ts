@@ -129,7 +129,7 @@ export const useDatabaseStore = defineStore("database", () => {
       `download collection [${formatTime(collectionId)}].json`
     )
   }
-  
+
   const insertDownloadCollection = async (collection: DownloadCollectionToSave) => {
     const albumListWithoutDuplicateData: Album[] = uniqBy(collection.albumList, 'id')
     const albumInsertResult = await db.value?.album.bulkInsert(albumListWithoutDuplicateData)
@@ -151,11 +151,30 @@ export const useDatabaseStore = defineStore("database", () => {
     } as DownloadCollectionQueryResult
   }
 
+  const getDownloadCollection = async (collectionId: number) => {
+    const downloadCollection = await db.value?.download_collection.findOne({
+      selector: {
+        createTime: collectionId
+      }
+    }).exec()
+    if (downloadCollection) {
+      const albumList = await downloadCollection?.populate('albumIdList')
+      const albumFullList = await downloadCollection?.populate('albumIdFullList')
+      return {
+        createTime: downloadCollection?.createTime,
+        albumList: albumList?.map((album: any) => album.toJSON()),
+        albumFullList: albumFullList?.map((album: any) => album.toJSON())
+      } as DownloadCollectionQueryResult
+    }
+    return null
+  }
+
   return {
     allCollectionList,
     initDatabase,
     insertDownloadCollection,
     exportDatabase,
     exportDownloadCollection,
+    getDownloadCollection,
   }
 })
