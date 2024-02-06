@@ -94,7 +94,10 @@ export const useDatabaseStore = defineStore("database", () => {
   }
 
   const refreshAllCollections = async () => {
-    db.value?.download_collection.find().exec()
+    db.value?.download_collection.find({
+      selector: {},
+      sort: [{ createTime: 'desc' }]
+    }).exec()
       .then(res => {
         console.warn(res)
         allCollectionList.value = res
@@ -143,6 +146,7 @@ export const useDatabaseStore = defineStore("database", () => {
       ?.download_collection
       .insert(collectionToInsert)
     const albumFullList = await downloadCollection?.populate('albumIdFullList')
+    await refreshAllCollections()
 
     return {
       createTime: downloadCollection.createTime,
@@ -169,6 +173,20 @@ export const useDatabaseStore = defineStore("database", () => {
     return null
   }
 
+  const removeDownloadCollectionById = async (collectionId: number) => {
+    const collection = await db.value?.download_collection.findOne({
+      selector: {
+        createTime: collectionId
+      }
+    }).exec()
+    if (collection) {
+      await collection.remove()
+      await refreshAllCollections()
+      return true
+    }
+    return false
+  }
+
   return {
     allCollectionList,
     initDatabase,
@@ -176,5 +194,6 @@ export const useDatabaseStore = defineStore("database", () => {
     exportDatabase,
     exportDownloadCollection,
     getDownloadCollection,
+    removeDownloadCollectionById,
   }
 })

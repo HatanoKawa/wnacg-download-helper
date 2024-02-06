@@ -6,7 +6,7 @@ import type { Album, DownloadCollectionQueryResult } from '../types'
 const COLOR_SET = {
   connected: "green",
   disconnected: "orange",
-  error: "red"
+  error: "#f56c6c"
 } as const
 
 export const useAria2RpcStore = defineStore("aria2rpc", () => {

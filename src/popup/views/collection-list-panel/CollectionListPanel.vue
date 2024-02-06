@@ -3,6 +3,8 @@ import { useDatabaseStore } from "../../store/database";
 import type { DownloadCollectionToSave } from "../../types";
 import dayjs from "dayjs";
 import { useAria2RpcStore } from "../../store/aria2rpc";
+import { sendActionToAllTabsAtAlbumMainLocation } from "../../utils";
+import DangerAnchor from "../../components/DangerAnchor.vue";
 
 const databaseStore = useDatabaseStore()
 const rpcStore = useAria2RpcStore()
@@ -11,44 +13,32 @@ const checkIsLegalAlbum = (album: any) => album && album.id && album.name && alb
   && album.downloadLinks && Array.isArray(album.downloadLinks)
   && (album.downloadLinks.length > 0)
 const collectAlbumData = () => {
-  chrome.tabs.query({
-    url: 'https://www.wnacg.com/photos-index-aid-*.html'
-  })
-    .then(tabs => {
-      Promise.allSettled(
-        tabs.map(tabData => {
-          return chrome.tabs.sendMessage(
-            tabData.id!,
-            { type: 'getAlbumData' }
-          )
-        })
-      ).then(res => {
-        const currentTime = Date.now()
-        const downloadCollection: DownloadCollectionToSave = {
-          createTime: currentTime,
-          albumList: res
-            .map(r => r.status === 'fulfilled' && checkIsLegalAlbum(r.value) ? r.value : null)
-            .filter(album => album != null)
-            .map(album => {
-              return {
-                ...album,
-                createTime: currentTime,
-              }
-            })
-        }
-        console.warn('collect downloadCollection: ', downloadCollection)
-        databaseStore.insertDownloadCollection(downloadCollection)
-          .then(res => {
-            console.warn('insertDownloadCollection: ', res)
+  sendActionToAllTabsAtAlbumMainLocation('getAlbumData')
+    .then(res => {
+      const currentTime = Date.now()
+      const downloadCollection: DownloadCollectionToSave = {
+        createTime: currentTime,
+        albumList: res
+          .map(r => r.status === 'fulfilled' && checkIsLegalAlbum(r.value.result) ? r.value.result : null)
+          .filter(album => album != null)
+          .map(album => {
+            return {
+              ...album,
+              createTime: currentTime,
+            }
           })
-      })
+      }
+      console.warn('collect downloadCollection: ', downloadCollection)
+      databaseStore.insertDownloadCollection(downloadCollection)
+        .then(res => {
+          console.warn('insertDownloadCollection: ', res)
+        })
     })
 }
 
 const startDownloadCollectionById = (collectionId: number) => {
   databaseStore.getDownloadCollection(collectionId)
     .then(collectionData => {
-      console.warn('startDownloadCollectionById: ', collectionData)
       if (collectionData) {
         collectionData.albumList.forEach(album => {
           rpcStore.startDownloadAlbum(album)
@@ -58,54 +48,81 @@ const startDownloadCollectionById = (collectionId: number) => {
       }
     })
 }
+
+const closeAllPagesHaveBeenCollected = () => {
+  sendActionToAllTabsAtAlbumMainLocation('checkHasCollected')
+    .then(res => {
+      const tabIdListToClose = res
+        .map(r => r.status === 'fulfilled' && r.value.result ? r.value.tabId : null)
+        .filter(tabId => tabId != null)
+      // @ts-ignore
+      chrome.tabs.remove(tabIdListToClose)
+    })
+}
 </script>
 
 <template>
-  <div class="tab-container">
-    <div
-      class="collection-item create-collection-button"
-      @click="collectAlbumData"
-    >
-      + Create Collection
-    </div>
+  <div class="tab-container" style="display: flex; flex-direction: column;">
     <div style="margin-bottom: 12px; display: flex;">
       rpc server state:
       <span style="margin-left: auto;" :style="{ color: rpcStore.aria2rpcStatusColor }">
         {{ rpcStore.aria2rpcStatus }}
       </span>
     </div>
+    <div style="margin-bottom: 12px; display: flex; align-items: center; justify-content: flex-end;">
+      <button @click="closeAllPagesHaveBeenCollected">close all pages have been collected</button>
+    </div>
     <div
-      v-for="collectionData in databaseStore.allCollectionList"
-      :key="collectionData.createTime"
-      class="collection-item"
+      class="collection-item create-collection-button"
+      @click="collectAlbumData"
     >
-      <div style="flex: 1;">
-        <div>
-          createTime： {{ dayjs(collectionData.createTime).format('YYYY-MM-DD HH:mm:ss')}}
+      + Create Collection
+    </div>
+    <div style="flex: 1; overflow-y: auto;">
+      <div
+        v-for="collectionData in databaseStore.allCollectionList"
+        :key="collectionData.createTime"
+        class="collection-item"
+      >
+        <div style="flex: 1;">
+          <div>
+            createTime： {{ dayjs(collectionData.createTime).format('YYYY-MM-DD HH:mm:ss')}}
+          </div>
+          <div>
+            new album count: {{ collectionData.albumIdList.length }}
+          </div>
+          <div>
+            all album count: {{ collectionData.albumIdFullList.length }}
+          </div>
         </div>
         <div>
-          new album count: {{ collectionData.albumIdList.length }}
+          <div
+            class="action-anchor"
+            style="color: skyblue;"
+            @click="startDownloadCollectionById(collectionData.createTime)"
+          >
+            DOWN
+          </div>
+          <div
+            class="action-anchor"
+            style="color: orange;"
+            @click="databaseStore.exportDownloadCollection(collectionData.createTime)"
+          >
+            EXPORT
+          </div>
+          <!--<div
+            class="action-anchor"
+            style="color: #f56c6c;"
+            @click="databaseStore.removeDownloadCollectionById(collectionData.createTime)"
+          >
+            REMOVE
+          </div>-->
+          <DangerAnchor
+            @confirm="databaseStore.removeDownloadCollectionById(collectionData.createTime)"
+          >
+            REMOVE
+          </DangerAnchor>
         </div>
-        <div>
-          all album count: {{ collectionData.albumIdFullList.length }}
-        </div>
-      </div>
-      <div>
-        <div
-          class="action-anchor"
-          style="color: skyblue;"
-          @click="startDownloadCollectionById(collectionData.createTime)"
-        >
-          DOWN
-        </div>
-        <div
-          class="action-anchor"
-          style="color: orange;"
-          @click="databaseStore.exportDownloadCollection(collectionData.createTime)"
-        >
-          EXPORT
-        </div>
-        <div class="action-anchor" style="color: red;">REMOVE</div>
       </div>
     </div>
   </div>
